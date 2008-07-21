@@ -12,21 +12,30 @@ begin
   require 'hpricot'
   
   class GetDoc
+    attr_accessor :transformation
+    
     CACHE_DIR = File.join(File.dirname(__FILE__), "..", "cache")
     CACHE_REFRESH = 1 * 60 # 1 minute
     
-    def initialize(docid, url = "http://docs.google.com/View?id=%s", &block)
+    GOOGLE_URL = "http://docs.google.com/View?id=%s"
+    GOOGLE_TRANSFORM =
+      proc do |hpricot|
+        (hpricot / "#doc-contents").inner_html.
+          gsub(/(src|href)="(View\?|File\?)/, "\\1=\"http://docs.google.com/\\2")
+      end
+    
+    def self.reset_cache
+      FileUtils.rm Dir.glob(File.join(CACHE_DIR, "*"))
+    end
+    
+    def initialize(docid, url = GOOGLE_URL, &block)
       @docid = docid
       @url = url
-      @transformation = block ||
-        proc do |hpricot|
-          (hpricot / "#doc-contents").inner_html.
-            gsub(/(src|href)="(View\?|File\?)/, "\\1=\"http://docs.google.com/\\2")
-        end
+      @transformation = block || GOOGLE_TRANSFORM
     end
     
     def cache_file
-      File.join(CACHE_DIR, @docid)
+      File.join(CACHE_DIR, @docid.gsub("/", "-"))
     end
     
     def cache_age
